@@ -1,0 +1,123 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ==========================================================================
+     EDIT THESE TWO PATHS IF YOURS ARE DIFFERENT
+    ==========================================================================
+     RoundsFolder  = where ROUNDS is installed (Steam > right-click ROUNDS >
+                     Manage > Browse local files).
+     ProfileFolder = your r2modman "Dev" profile (r2modman > Settings >
+                     Browse profile folder). It must have TabInfo installed
+                     (willreuploadscuzheruinedstuff-TabInfo). CatInfo is optional.
+  -->
+  <PropertyGroup>
+    <RoundsFolder Condition="'$(RoundsFolder)' == ''">D:\SteamLibrary\steamapps\common\ROUNDS</RoundsFolder>
+    <ProfileFolder Condition="'$(ProfileFolder)' == ''">$(APPDATA)\r2modmanPlus-local\ROUNDS\profiles\Dev</ProfileFolder>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>TabStyle</AssemblyName>
+    <RootNamespace>TabStyle</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <!-- Bump this AND Thunderstore\manifest.json "version_number" (+ Version in Plugin.cs) for each release. -->
+    <Version>1.0.0</Version>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <DebugType>portable</DebugType>
+    <!-- Keep your PC's folder names (and user name) out of the built DLL. -->
+    <PathMap>$(MSBuildProjectDirectory)=TabStyle</PathMap>
+    <Deterministic>true</Deterministic>
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+    <MSBuildWarningsAsMessages>MSB3277;MSB3243</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <!-- Building somewhere without the .NET Framework targeting pack (not needed in Visual Studio):
+       compile straight against the game's own copy of mscorlib/System. -->
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <FrameworkPathOverride>$(RoundsFolder)\Rounds_Data\Managed</FrameworkPathOverride>
+    <NoStdLib>true</NoStdLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+  </PropertyGroup>
+
+  <!-- Never copy game / library DLLs into the output; they already exist in the game. -->
+  <ItemDefinitionGroup>
+    <Reference>
+      <Private>false</Private>
+    </Reference>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <!-- BepInEx + Harmony (installed by BepInExPack_ROUNDS in your profile) -->
+    <Reference Include="$(ProfileFolder)\BepInEx\core\BepInEx.dll" />
+    <Reference Include="$(ProfileFolder)\BepInEx\core\0Harmony.dll" />
+
+    <!-- Mod libraries. ** finds them whatever sub-folder r2modman put them in.
+         CatInfo is NOT referenced: its stats simply show up through TabInfo when it's installed. -->
+    <Reference Include="$(ProfileFolder)\BepInEx\plugins\**\UnboundLib.dll" />
+    <Reference Include="$(ProfileFolder)\BepInEx\plugins\**\TabInfo.dll" />
+
+    <!-- The game itself + Unity + Photon. System/mscorlib come from .NET 4.7.2 instead. -->
+    <Reference Include="$(RoundsFolder)\Rounds_Data\Managed\*.dll"
+               Exclude="$(RoundsFolder)\Rounds_Data\Managed\mscorlib.dll;
+                        $(RoundsFolder)\Rounds_Data\Managed\netstandard.dll;
+                        $(RoundsFolder)\Rounds_Data\Managed\System.dll;
+                        $(RoundsFolder)\Rounds_Data\Managed\System.*.dll;
+                        $(RoundsFolder)\Rounds_Data\Managed\Mono.*.dll;
+                        $(RoundsFolder)\Rounds_Data\Managed\Microsoft.*.dll" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <Reference Include="$(RoundsFolder)\Rounds_Data\Managed\mscorlib.dll" />
+    <Reference Include="$(RoundsFolder)\Rounds_Data\Managed\netstandard.dll" />
+    <Reference Include="$(RoundsFolder)\Rounds_Data\Managed\System.dll" />
+    <Reference Include="$(RoundsFolder)\Rounds_Data\Managed\System.Core.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Thunderstore\**" />
+  </ItemGroup>
+
+  <!-- Friendly errors instead of 200 "type not found" errors when a path is wrong. -->
+  <Target Name="CheckPaths" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <_TabInfoDll Include="$(ProfileFolder)\BepInEx\plugins\**\TabInfo.dll" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(RoundsFolder)\Rounds_Data\Managed\Assembly-CSharp.dll')"
+           Text="Can't find ROUNDS at '$(RoundsFolder)'. Open TabStyle.csproj and fix RoundsFolder at the top." />
+    <Error Condition="!Exists('$(ProfileFolder)\BepInEx\core\BepInEx.dll')"
+           Text="Can't find the r2modman profile at '$(ProfileFolder)'. Open TabStyle.csproj and fix ProfileFolder at the top (and launch the profile modded once)." />
+    <Error Condition="'@(_TabInfoDll)' == ''"
+           Text="TabInfo isn't installed in '$(ProfileFolder)'. In r2modman, add 'TabInfo' by willreuploadscuzheruinedstuff to that profile, then build again." />
+  </Target>
+
+  <!-- After every build on your PC: drop the DLL straight into your Dev profile so you can just hit Start modded. -->
+  <Target Name="CopyToProfile" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <PropertyGroup>
+      <DevPluginFolder>$(ProfileFolder)\BepInEx\plugins\Zen-TabStyle</DevPluginFolder>
+    </PropertyGroup>
+    <MakeDir Directories="$(DevPluginFolder)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DevPluginFolder)" />
+    <Message Importance="high" Text="TabStyle -> copied to $(DevPluginFolder)" />
+  </Target>
+
+  <!-- Release builds also make the Thunderstore upload zip in the 'release' folder. -->
+  <Target Name="PackageThunderstore" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <PkgDir>$(MSBuildProjectDirectory)\obj\thunderstore</PkgDir>
+      <ReleaseDir>$(MSBuildProjectDirectory)\..\release</ReleaseDir>
+      <ManifestText>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\Thunderstore\manifest.json'))</ManifestText>
+      <ManifestVersion>$([System.Text.RegularExpressions.Regex]::Match($(ManifestText), '"version_number"\s*:\s*"([^"]+)"').Groups[1].Value)</ManifestVersion>
+    </PropertyGroup>
+    <Warning Condition="'$(ManifestVersion)' != '$(Version)'"
+             Text="Version mismatch: TabStyle.csproj says $(Version) but Thunderstore\manifest.json says $(ManifestVersion). Thunderstore will use the manifest version." />
+    <RemoveDir Directories="$(PkgDir)" />
+    <MakeDir Directories="$(PkgDir);$(ReleaseDir)" />
+    <Copy SourceFiles="$(TargetPath);Thunderstore\manifest.json;Thunderstore\icon.png;Thunderstore\README.md" DestinationFolder="$(PkgDir)" />
+    <ZipDirectory SourceDirectory="$(PkgDir)" DestinationFile="$(ReleaseDir)\Zen-TabStyle-$(Version).zip" Overwrite="true" />
+    <Message Importance="high" Text="Thunderstore zip -> $(ReleaseDir)\Zen-TabStyle-$(Version).zip" />
+  </Target>
+
+</Project>

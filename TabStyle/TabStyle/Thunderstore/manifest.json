@@ -1,0 +1,12 @@
+{
+    "name": "TabStyle",
+    "version_number": "1.0.0",
+    "website_url": "https://thunderstore.io/c/rounds/p/Zenith/",
+    "description": "A clean, modern Tab screen for TabInfo. 6 layouts, 6 color themes, find yourself instantly.",
+    "dependencies": [
+        "BepInEx-BepInExPack_ROUNDS-5.4.1900",
+        "willis81808-UnboundLib-3.2.14",
+        "willreuploadscuzheruinedstuff-TabInfo-0.0.3",
+        "CatsArmy-CatInfo-2.4.1"
+    ]
+}
